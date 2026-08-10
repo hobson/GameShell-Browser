@@ -11,6 +11,6 @@
 # ttyd listens on 127.0.0.1:7682 only (see deploy/gsh-serve.sh), so this proxy
 # is the ONLY public way in. Do not open 7682 in ufw.
 
-gameshell.proai.org {
+0.0.0.0 {
 	reverse_proxy 127.0.0.1:7682
 }
