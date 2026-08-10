@@ -6,8 +6,8 @@ After=docker.service
 
 [Service]
 Type=simple
-User=bou
-ExecStart=/home/bou/GameShell-Browser/deploy/gsh-janitor.sh
+User=$USER
+ExecStart=$HOME/GameShell-Browser/deploy/gsh-janitor.sh
 Restart=always
 RestartSec=5
 
