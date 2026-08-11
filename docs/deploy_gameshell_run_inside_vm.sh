@@ -1,6 +1,22 @@
 # DONTDO: more README-Browser.md 
 # more docs/browser-deployment.md
 sudo echo Warning: using sudo to configure this server -- $HOSTNAME || echo "This script requires sudo. Run 'sudo echo hello sudo' to log into sudoer user before running this script".
+if [[ -z "$FQDN" ]] ; then
+    export FQDN='gsh.proai.org, bash.proai.org, sh.proai.org' 
+    echo "WARNING! You did not set the FQDN environment variable!! Defaulting to '$FQDN' !!!"
+fi
+if [[ -z "$SSH_PORT" ]] ; then
+    export SSH_PORT=22
+    echo "WARNING! You did not set the SSH_PORT environment variable!! Defaulting to $SSH_PORT !!!"
+    echo "Check to be 100% certain that $SSH_PORT is the correct port for your VM !!!"
+    echo "!!!!! If not, hit [ctrl]-c to cancel within 3 seconds !!!!!"
+    sleep 1
+    echo "!!!!! If not, hit [ctrl]-c to cancel within 2 seconds !!!!!"
+    sleep 1
+    echo "!!!!! If not, hit [ctrl]-c to cancel within 1 seconds !!!!!"
+    sleep 1
+fi
+
 sudo apt install --upgrade -y ttyd caddy
 cd $HOME
 git clone https://github.com/aboutalib1953/GameShell-Browser || echo "GameShell-Browser repo already cloned?"
@@ -20,11 +36,18 @@ sudo systemctl enable --now gameshell-janitor.service gameshell-ttyd.service
 systemctl --no-pager status gameshell-janitor.service 
 systemctl --no-pager status gameshell-ttyd.service 
 
+# Before running this script, or on the same line within sudo env:
+export FQDN='gsh.proai.org, bash.proai.org, sh.proai.org' 
 if [[ -n "$FQDN" ]] ; then
    sed -i s%'0.0.0.0'%"$FQDN"%g deploy/Caddyfile
 fi
-sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
-sudo systemctl reload caddy
+sudo ln deploy/Caddyfile /etc/caddy/Caddyfile
+sudo systemctl enable --now caddy
+# sudo systemctl reload caddy
+
+sudo ufw allow $SSH_PORT/tcp  # double and tripple-check SSH_PORT!
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
 
 # TODO
 # configure Caddy/ufw/Docker to expose appropriate ports and allow http:/ to IP address?
