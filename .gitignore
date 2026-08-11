@@ -12,6 +12,9 @@ locale/
 /gameshell*
 game shell*
 boxes-data.awk
-
+nohup.out
+.claude
+CLAUDE.md
+AGENTS.md
 # Local-only project notes -- not for the public fork
 PROJECT_PLAN.md
