@@ -43,6 +43,36 @@ over (or if they type in process-ending commands lol).
 
 ---
 
+## Automated deployment (Ansible)
+
+Everything below this section is the **manual** runbook. It is the reference for
+how the pieces fit together, and the way to deploy if you want to do it by hand.
+
+If you just want a working deployment, use the Ansible playbook in
+[`deploy/ansible/`](../deploy/ansible/README.md) instead. It provisions a VM on
+Hetzner Cloud or Contabo and performs every step below, idempotently:
+
+```sh
+cd deploy/ansible
+ansible-galaxy collection install -r requirements.yml
+# set gsh_domains, app_authorized_keys and gsh_repo_url in playbooks/group_vars/all.yml
+export HCLOUD_TOKEN=...
+ansible-playbook playbooks/site.yml
+```
+
+It also fixes several things the manual path leaves to you: it hardens SSH,
+enables `ufw` (step 7 below only *adds rules*), handles Ubuntu 24.04's
+socket-activated sshd, asserts ttyd is new enough to have `-W`, and asserts ttyd
+never ends up bound to a public interface.
+
+The playbook renders its own systemd units and Caddyfile from templates and
+**never modifies the checked-in `deploy/` files**, so the two paths coexist.
+
+> `docs/deploy_gameshell_run_inside_vm.sh` was an earlier, partial attempt at
+> scripting this. It is superseded by the playbook.
+
+---
+
 ## Prerequisites
 
 - A Linux VM with a public IP. 1 GB RAM is enough to build the image and serve

@@ -1,0 +1,55 @@
+---
+# Caddy 2 from its official apt repo, fronting ttyd with automatic HTTPS.
+#
+# Unlike rtod's caddy role, this one keeps the packaged systemd unit and the
+# packaged `caddy` system user. rtod overrides both so Caddy can run as its app
+# user against a repo-local Caddyfile; GameShell has no such need, and the stock
+# setup already has the CAP_NET_BIND_SERVICE it needs for :80/:443.
+
+- name: Download Caddy's GPG key (ASCII-armored)
+  ansible.builtin.get_url:
+    url: https://dl.cloudsmith.io/public/caddy/stable/gpg.key
+    dest: /usr/share/keyrings/caddy-stable-archive-keyring.asc
+    mode: "0644"
+
+- name: Dearmor Caddy's GPG key into the binary keyring apt expects
+  ansible.builtin.command: >-
+    gpg --yes --dearmor
+    -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+    /usr/share/keyrings/caddy-stable-archive-keyring.asc
+  args:
+    creates: /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+
+# Full-file copy rather than apt_repository, for the same reason as the docker
+# role: apt_repository appends and can leave two differently-keyringed lines for
+# one URL, which apt refuses to load at all. This exact failure hit rtod.
+- name: Write the Caddy apt source list (single deb line, overwriting any prior version)
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/caddy-stable.list
+    mode: "0644"
+    content: |
+      deb [signed-by=/usr/share/keyrings/caddy-stable-archive-keyring.gpg] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main
+
+- name: Install caddy
+  ansible.builtin.apt:
+    name: caddy
+    state: present
+    update_cache: true
+
+- name: Template the Caddyfile
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: /etc/caddy/Caddyfile
+    owner: root
+    group: root
+    mode: "0644"
+    # A syntactically broken Caddyfile would otherwise be written, and the
+    # reload would fail *after* the old config was already replaced on disk.
+    validate: "caddy validate --adapter caddyfile --config %s"
+  notify: Reload caddy
+
+- name: Enable and start caddy
+  ansible.builtin.systemd:
+    name: caddy
+    enabled: true
+    state: started

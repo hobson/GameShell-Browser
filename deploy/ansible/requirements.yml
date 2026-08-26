@@ -1,0 +1,32 @@
+---
+# Install with: ansible-galaxy collection install -r requirements.yml
+collections:
+  - name: hetzner.hcloud
+    # >=7.0.0: v7 renamed the modules from hcloud_server to server (etc). The
+    # cloud_vm role uses the current short names.
+    version: ">=7.0.0"
+
+  - name: ansible.posix
+    # >=2.2.0: 2.1.0 and earlier import ansible.module_utils._text, removed in
+    # ansible-core 2.24, which breaks authorized_key.
+    version: ">=2.2.0"
+
+  - name: community.general
+    # ufw module
+    version: ">=9.0.0"
+
+  # NOTE: totalgood.cloud (the cloud_vm role + the Contabo modules) is
+  # deliberately NOT listed here. ansible-galaxy does not expand `~` in a
+  # `source:` path, and hardcoding an absolute path would only work on one
+  # machine. ansible.cfg's collections_path already includes
+  # ~/code/od/ansible-cloud, so a checkout there is found automatically.
+  #
+  # If it lives somewhere else, either point ANSIBLE_COLLECTIONS_PATH at it:
+  #     export ANSIBLE_COLLECTIONS_PATH=/path/to/ansible-cloud
+  # or install it once from the checkout:
+  #     ansible-galaxy collection install /path/to/ansible-cloud/ansible_collections/totalgood/cloud
+  #
+  # Once it is published to git, this becomes a normal entry:
+  #   - name: https://github.com/totalgood/ansible-cloud.git
+  #     type: git
+  #     version: main

@@ -1,0 +1,82 @@
+---
+# Docker CE from the official apt repo, plus app_user in the docker group.
+#
+# docs/browser-deployment.md is explicit that the docker group is effectively
+# root, and that the GameShell services must not run as root themselves. Both
+# stay true here: app_user is in the docker group (it has to be, to launch
+# session containers) but no service runs as uid 0.
+
+- name: Install apt prerequisites for the Docker repo
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+
+- name: Download Docker's GPG key (ASCII-armored)
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /usr/share/keyrings/docker.asc
+    mode: "0644"
+
+- name: Dearmor Docker's GPG key into the binary keyring apt expects
+  ansible.builtin.command: >-
+    gpg --yes --dearmor
+    -o /usr/share/keyrings/docker-archive-keyring.gpg
+    /usr/share/keyrings/docker.asc
+  args:
+    creates: /usr/share/keyrings/docker-archive-keyring.gpg
+
+# Deliberately a full-file `copy`, not apt_repository. apt_repository *appends*
+# a new deb line when a file of this name already exists rather than replacing
+# it, so a box that had a hand-added docker.list ends up with two differently-
+# keyringed lines for the same URL, and apt then refuses to load either
+# ("Conflicting values set for option Signed-By"). This bit rtod on its Caddy
+# repo. A full overwrite is idempotent and cannot accumulate duplicates.
+- name: Write the Docker apt source list (single deb line, overwriting any prior version)
+  vars:
+    _docker_deb_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/docker.list
+    mode: "0644"
+    content: |
+      deb [arch={{ _docker_deb_arch }} signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+  register: _docker_docker_apt_source
+
+- name: Install Docker Engine
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+    state: present
+    update_cache: true
+
+- name: Enable and start Docker
+  ansible.builtin.systemd:
+    name: docker
+    enabled: true
+    state: started
+
+- name: Add the app user to the docker group
+  ansible.builtin.user:
+    name: "{{ app_user }}"
+    groups: docker
+    append: true
+  register: _docker_docker_group
+
+# A user's supplementary groups are fixed at login, so the SSH session we are
+# already inside does not have the docker group yet. Without dropping the
+# connection, every later `docker` command run as app_user fails with a
+# permission-denied on /var/run/docker.sock for the rest of the play.
+- name: Reset the connection so the new docker group membership takes effect
+  ansible.builtin.meta: reset_connection
+
+- name: Verify the app user can talk to the Docker daemon
+  ansible.builtin.command: docker version --format '{{ "{{" }}.Server.Version{{ "}}" }}'
+  become: true
+  become_user: "{{ app_user }}"
+  register: _docker_docker_ok
+  changed_when: false

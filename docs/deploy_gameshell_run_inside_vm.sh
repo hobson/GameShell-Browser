@@ -1,3 +1,20 @@
+# SUPERSEDED -- kept for reference only.
+#
+# This was distilled by hand from a real deployment session (see hist_logs/) and
+# was never fully idempotent. Known problems, all fixed in the playbook:
+#   - sed's deploy/systemd/*.service and deploy/Caddyfile IN PLACE, dirtying the
+#     working tree, so a second run substitutes into already-substituted files
+#   - re-exports FQDN unconditionally at line ~40, silently overriding whatever
+#     the operator set at the top
+#   - `apt install caddy` without first adding the Caddy apt repo, so it only
+#     works if that was done by hand beforehand
+#   - `ln` (hard link) rather than cp into /etc/caddy/Caddyfile
+#   - adds ufw rules but never runs `ufw enable`, so the firewall stays inactive
+#   - no SSH hardening, no fail2ban, no VM provisioning
+#
+# Use deploy/ansible/ instead:  ansible-playbook playbooks/site.yml
+# See deploy/ansible/README.md and docs/browser-deployment.md.
+
 # DONTDO: more README-Browser.md 
 # more docs/browser-deployment.md
 sudo echo Warning: using sudo to configure this server -- $HOSTNAME || echo "This script requires sudo. Run 'sudo echo hello sudo' to log into sudoer user before running this script".

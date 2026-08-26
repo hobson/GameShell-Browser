@@ -1,0 +1,13 @@
+# Managed by Ansible - do not edit by hand.
+# Rendered from deploy/ansible/playbooks/roles/caddy/templates/Caddyfile.j2.
+#
+# Caddy obtains and renews the Let's Encrypt certificate automatically -- there
+# is deliberately no cert configuration here. It needs port 80 reachable for the
+# ACME challenge, and every domain below must already resolve to this machine.
+#
+# ttyd listens on {{ gsh_iface }}:{{ gsh_port }} only (see deploy/gsh-serve.sh),
+# so this proxy is the ONLY public way in. Do not open {{ gsh_port }} in ufw.
+
+{{ gsh_domains | join(', ') }} {
+	reverse_proxy 127.0.0.1:{{ gsh_port }}
+}

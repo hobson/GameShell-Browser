@@ -1,0 +1,8 @@
+---
+# reload, not restart: a reload swaps config with zero dropped connections, so
+# in-progress GameShell sessions survive a redeploy. A restart would kill every
+# player's websocket.
+- name: Reload caddy
+  ansible.builtin.systemd:
+    name: caddy
+    state: reloaded

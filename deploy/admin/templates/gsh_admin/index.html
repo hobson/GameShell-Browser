@@ -1,0 +1,32 @@
+{% extends 'admin/master.html' %}
+
+{% block body %}
+<h1>GameShell session defaults</h1>
+<p class="text-muted">
+  Applies to every new session that connects after you save — existing
+  sessions already in progress are unaffected.
+</p>
+
+<form method="post" style="max-width: 32rem;">
+  <div class="form-group">
+    <div class="checkbox">
+      <label>
+        <input type="checkbox" name="python_enabled" {% if current.GSH_ENABLE_PYTHON == "1" %}checked{% endif %}>
+        Allow <code>python</code> / <code>python3</code> in the game shell
+      </label>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label for="index_file">Starting mission list</label>
+    <select class="form-control" id="index_file" name="index_file">
+      {% for path in index_files %}
+        <option value="{{ path }}" {% if path == current.GSH_INDEX_FILE %}selected{% endif %}>{{ path }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <button type="submit" class="btn btn-primary">Save</button>
+  <a href="{{ url_for('fat_auth.logout') }}" class="btn btn-link">Log out</a>
+</form>
+{% endblock %}

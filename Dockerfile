@@ -12,7 +12,9 @@ RUN apt install --no-install-recommends --assume-yes \
     nano \
     tree \
     ncal \
-    x11-apps
+    x11-apps \
+    python3 \
+    python-is-python3
 RUN apt clean
 RUN rm -rf /var/lib/apt/lists/*
 
@@ -49,4 +51,9 @@ ADD --chown=gsh-user:gsh-user https://github.com/phyver/GameShell/releases/downl
 ### (NOTE that you need to have generated a "gameshell.sh" file with GSH_ROOT/utils/gameshell_archive.sh
 # COPY gameshell.sh .
 
-ENTRYPOINT ["bash", "./gameshell.sh"]
+### entrypoint wrapper -- conditionally hides python (GSH_ENABLE_PYTHON=0,
+### set per-session by deploy/gsh-session.sh) before handing off to the game
+COPY --chown=gsh-user:gsh-user deploy/docker-entrypoint.sh .
+RUN chmod +x docker-entrypoint.sh
+
+ENTRYPOINT ["./docker-entrypoint.sh"]

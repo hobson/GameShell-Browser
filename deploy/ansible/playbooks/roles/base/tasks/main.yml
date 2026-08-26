@@ -1,0 +1,153 @@
+---
+# OS bootstrap: packages, app_user, SSH hardening, ufw, fail2ban.
+#
+# Ported from rtod/ansible/roles/base, dropping the rtod-specific parts
+# (NodeSource/Node.js, uv, python3-psycopg2). Idempotent: re-running against an
+# already-bootstrapped box is a no-op, which is why configure.yml lists it in
+# both plays.
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install base OS packages
+  ansible.builtin.apt:
+    name:
+      - fail2ban
+      - ufw
+      - curl
+      - ca-certificates
+      - gnupg
+      - jq
+      - debian-keyring
+      - debian-archive-keyring
+      - apt-transport-https
+    state: present
+
+- name: Create the app group
+  ansible.builtin.group:
+    name: "{{ app_group }}"
+    state: present
+
+- name: Create the app user
+  ansible.builtin.user:
+    name: "{{ app_user }}"
+    group: "{{ app_group }}"
+    groups: sudo
+    shell: /bin/bash
+    create_home: true
+    state: present
+
+- name: Allow the app user passwordless sudo
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/90-{{ app_user }}"
+    content: "{{ app_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    mode: "0440"
+    validate: "visudo -cf %s"
+
+- name: Authorize SSH keys for the app user
+  ansible.posix.authorized_key:
+    user: "{{ app_user }}"
+    key: "{{ item }}"
+    state: present
+  loop: "{{ app_authorized_keys }}"
+
+# Guard against the classic self-lockout: hardening below disables password auth
+# and root login, so if no key landed above, nobody can ever log in again.
+- name: Verify the app user has at least one authorized key before hardening
+  ansible.builtin.command: "awk 'NF && $0 !~ /^#/' /home/{{ app_user }}/.ssh/authorized_keys"
+  register: _base_authkeys
+  changed_when: false
+  failed_when: _base_authkeys.rc != 0 or _base_authkeys.stdout | trim | length == 0
+
+- name: Template SSH hardening config
+  ansible.builtin.template:
+    src: sshd_hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/ssh-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+    # sshd treats the fragment as a whole config here, which is fine (everything
+    # else defaults). It runs as root on the target, so the host keys it wants to
+    # load are readable; the same command as a normal user fails with "no
+    # hostkeys available", which is a permissions artifact, not a bad config.
+    validate: "sshd -t -f %s"
+  notify: Restart sshd
+
+# Ubuntu 23.04+ (so 24.04, our default image) socket-activates sshd via
+# ssh.socket. When it does, the `Port` directive in sshd_config is SILENTLY
+# IGNORED -- sshd inherits whatever socket systemd hands it. Hardening would
+# appear to succeed while sshd kept listening on 22, and the second play, which
+# connects on ssh_port, would then hang until timeout.
+#
+# So: detect socket activation and, when present, drive the port from the socket
+# unit. The empty `ListenStream=` first is required -- systemd list directives
+# append, so without the reset we would listen on BOTH 22 and ssh_port.
+- name: Gather service facts to detect ssh.socket activation (Ubuntu 23.04+)
+  ansible.builtin.service_facts:
+
+- name: Override ssh.socket to listen on ssh_port
+  when: >-
+    ansible_facts.services['ssh.socket'] is defined
+    and ansible_facts.services['ssh.socket'].status == 'enabled'
+  block:
+    - name: Create the ssh.socket drop-in directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/ssh.socket.d
+        state: directory
+        mode: "0755"
+
+    - name: Write the ssh.socket port override
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/ssh.socket.d/10-port.conf
+        mode: "0644"
+        content: |
+          # Managed by Ansible - do not edit by hand
+          [Socket]
+          ListenStream=
+          ListenStream={{ ssh_port }}
+      notify: Restart ssh socket
+
+- name: Template fail2ban sshd jail
+  ansible.builtin.copy:
+    dest: /etc/fail2ban/jail.local
+    content: |
+      # Managed by Ansible - do not edit by hand
+      [sshd]
+      enabled = true
+      port = {{ ssh_port }}
+      banaction = iptables-multiport
+    mode: "0644"
+  notify: Restart fail2ban
+
+- name: Enable fail2ban
+  ansible.builtin.systemd:
+    name: fail2ban
+    enabled: true
+    state: started
+
+# Only SSH, HTTP and HTTPS. Deliberately NOT gsh_port (7682): ttyd binds
+# loopback only and Caddy is the sole public listener. Opening 7682 would
+# expose an unauthenticated root-capable terminal to the internet.
+- name: Allow SSH/HTTP/HTTPS through ufw
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "{{ ssh_port }}"
+    - "80"
+    - "443"
+
+- name: Enable ufw
+  community.general.ufw:
+    state: enabled
+    policy: deny
+
+# Without this, the sshd restart stays queued until the end of the play, but the
+# ufw rules above have already closed port 22 -- the next task hangs until the
+# SSH timeout. Flushing here moves sshd onto ssh_port while we still hold the
+# root@22 connection.
+- name: Flush handlers now so sshd is on ssh_port before we lose the root@22 connection
+  ansible.builtin.meta: flush_handlers

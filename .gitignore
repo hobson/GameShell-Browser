@@ -18,3 +18,15 @@ CLAUDE.md
 AGENTS.md
 # Local-only project notes -- not for the public fork
 PROJECT_PLAN.md
+
+# per-deployment secrets/config -- copy the .sample files instead
+deploy/config.env
+deploy/admin/.env
+deploy/admin/.venv
+deploy/admin/__pycache__
+deploy/admin/*.egg-info
+deploy/flask-admin-toolkit
+
+# Ansible deployment (deploy/ansible)
+deploy/ansible/.provisioned_hosts.yml
+*.retry

@@ -1,0 +1,21 @@
+---
+# Pull a prebuilt image and retag it to gsh_image.
+#
+# The retag matters: deploy/gsh-session.sh runs `docker run ... "$IMAGE"` with
+# IMAGE defaulting to `gameshell`. Retagging locally means the session script and
+# the systemd units need no knowledge of the registry at all, so build- and
+# registry-sourced deployments are byte-identical from ttyd downwards.
+
+- name: Pull the GameShell image from the registry
+  ansible.builtin.command: "docker pull {{ gsh_registry_image }}"
+  become: true
+  become_user: "{{ app_user }}"
+  register: _gameshell_gsh_pull
+  changed_when: "'Image is up to date' not in _gameshell_gsh_pull.stdout"
+  notify: Restart gameshell-ttyd
+
+- name: Tag the pulled image as {{ gsh_image }}
+  ansible.builtin.command: "docker tag {{ gsh_registry_image }} {{ gsh_image }}"
+  become: true
+  become_user: "{{ app_user }}"
+  changed_when: _gameshell_gsh_pull.changed

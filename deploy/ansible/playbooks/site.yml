@@ -1,0 +1,17 @@
+---
+# Provision a VM and configure it, end to end.
+#
+#   export HCLOUD_TOKEN=...
+#   ansible-playbook playbooks/site.yml
+#
+# Re-running is safe and is the real test of this playbook: a second run against
+# an unchanged deployment should report changed=0.
+#
+# To configure an existing box without any provisioning, run configure.yml
+# directly with --limit.
+
+- name: Provision
+  ansible.builtin.import_playbook: provision.yml
+
+- name: Configure
+  ansible.builtin.import_playbook: configure.yml

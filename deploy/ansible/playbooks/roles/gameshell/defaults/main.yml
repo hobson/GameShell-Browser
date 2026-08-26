@@ -1,0 +1,4 @@
+---
+# Upstream static ttyd used only when the distro package is missing or older
+# than gsh_ttyd_min_version (Ubuntu 22.04 ships 1.6.x, which lacks -W).
+gameshell_ttyd_fallback_version: "1.7.7"

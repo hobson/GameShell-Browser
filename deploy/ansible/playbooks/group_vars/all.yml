@@ -1,0 +1,91 @@
+---
+# Non-secret defaults for provisioning + deploying browser GameShell.
+# Override with -e "var=value", or a host_vars/ file per box.
+#
+# API credentials are NOT here and never should be -- they come from the
+# environment only (HCLOUD_TOKEN, or the four CONTABO_* vars). See README.md.
+
+# ---------------------------------------------------------------------------
+# Required -- provisioning and configuration both refuse to run without these.
+# ---------------------------------------------------------------------------
+
+# Domains Caddy will request a Let's Encrypt certificate for. A list, so the
+# multi-domain case is native rather than a comma-jammed string.
+# Every one of these must already have an A record pointing at the VM, and if
+# behind Cloudflare must be DNS-only (grey cloud) -- ACME cannot validate
+# through the orange-cloud proxy.
+gsh_domains: []
+# gsh_domains:
+#   - gsh.proai.org
+#   - bash.proai.org
+#   - sh.proai.org
+
+# Public keys allowed to log in as app_user. Get this wrong and the hardening
+# step locks you out of the box permanently.
+app_authorized_keys: []
+# app_authorized_keys:
+#   - "ssh-ed25519 AAAA... you@yourmachine"
+
+# Which fork to deploy. Three different URLs exist in the wild for this project
+# (aboudia9, aboutalib1953, and local remotes), so there is deliberately no
+# default -- name the one you mean.
+gsh_repo_url: ""
+gsh_repo_version: main
+
+# ---------------------------------------------------------------------------
+# Cloud VM (playbooks/provision.yml -> totalgood.cloud.cloud_vm)
+# ---------------------------------------------------------------------------
+cloud_provider: hcloud              # hcloud | contabo
+cloud_vm_default_name: gameshell
+cloud_vm_facts_file: "{{ playbook_dir }}/../.provisioned_hosts.yml"
+ssh_key_public_path: "{{ lookup('env', 'HOME') }}/.ssh/id_ed25519.pub"
+
+# Hetzner. docs/browser-deployment.md measures ~30 MB actual per session against
+# a 256 MB ceiling; 1 GB RAM serves ~15 players. cx22 (2 vCPU / 4 GB) leaves
+# comfortable headroom for a classroom.
+hcloud_server_name: "{{ cloud_vm_default_name }}"
+hcloud_server_type: cx22
+hcloud_location: hel1
+hcloud_image: ubuntu-24.04
+
+# Contabo. image_id is a UUID, not a name -- list via GET /v1/compute/images
+# once and pin it. Ordering an instance is a paid subscription; see the
+# totalgood.cloud README.
+contabo_display_name: "{{ cloud_vm_default_name }}"
+contabo_product_id: V45
+contabo_region: US-central
+contabo_image_id: ""
+
+# The cloud firewall must keep allowing the port sshd actually listens on. base
+# moves sshd to ssh_port, so open both that and 22.
+cloud_vm_firewall_rules:
+  - {direction: in, protocol: tcp, port: "22", source_ips: ["0.0.0.0/0", "::/0"]}
+  - {direction: in, protocol: tcp, port: "{{ ssh_port }}", source_ips: ["0.0.0.0/0", "::/0"]}
+  - {direction: in, protocol: tcp, port: "80", source_ips: ["0.0.0.0/0", "::/0"]}
+  - {direction: in, protocol: tcp, port: "443", source_ips: ["0.0.0.0/0", "::/0"]}
+  - {direction: in, protocol: icmp, source_ips: ["0.0.0.0/0", "::/0"]}
+
+# ---------------------------------------------------------------------------
+# OS / accounts (roles/base)
+# ---------------------------------------------------------------------------
+app_user: gsh
+app_group: gsh
+ssh_port: 2222
+
+# ---------------------------------------------------------------------------
+# GameShell (roles/gameshell)
+# ---------------------------------------------------------------------------
+gsh_repo_dir: "/home/{{ app_user }}/GameShell-Browser"
+
+# build    -> docker build from gsh_repo_dir on the VM (no registry needed)
+# registry -> docker pull gsh_registry_image, then retag it to gsh_image
+gsh_image_source: build
+gsh_image: gameshell               # gsh-session.sh's default; keep in sync
+gsh_registry_image: ""             # e.g. ghcr.io/you/gameshell:latest
+gsh_force_image_build: false       # -e gsh_force_image_build=true to rebuild
+
+# ttyd. 7681 is avoided because DigitalOcean's droplet-agent already uses it.
+gsh_port: 7682
+gsh_iface: lo                      # loopback ONLY; Caddy is the public listener
+gsh_janitor_interval: 5
+gsh_ttyd_min_version: "1.7.0"      # -W (writable) does not exist before this

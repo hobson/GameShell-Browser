@@ -1,0 +1,26 @@
+# Managed by Ansible - do not edit by hand.
+# Rendered from deploy/ansible/playbooks/roles/gameshell/templates/.
+#
+# Not optional. ttyd SIGKILLs its child process group on disconnect, so the
+# `docker run` client dies without ever removing its container -- see the
+# comments in deploy/gsh-session.sh and "Why the janitor exists" in
+# docs/browser-deployment.md. Without this unit, abandoned containers accumulate
+# until the box runs out of memory.
+
+[Unit]
+Description=GameShell session container reaper
+Documentation=https://github.com/phyver/GameShell
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=simple
+User={{ app_user }}
+Group={{ app_group }}
+Environment=GSH_JANITOR_INTERVAL={{ gsh_janitor_interval }}
+ExecStart={{ gsh_repo_dir }}/deploy/gsh-janitor.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

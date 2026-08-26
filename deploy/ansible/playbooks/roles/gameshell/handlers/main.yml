@@ -1,0 +1,15 @@
+---
+# Order matters on a combined restart: the janitor should be up before ttyd
+# starts handing out sessions, so nothing is ever unreaped. systemd handles the
+# dependency too (gameshell-ttyd Wants= the janitor), this just matches it.
+- name: Restart gameshell-janitor
+  ansible.builtin.systemd:
+    name: gameshell-janitor.service
+    state: restarted
+    daemon_reload: true
+
+- name: Restart gameshell-ttyd
+  ansible.builtin.systemd:
+    name: gameshell-ttyd.service
+    state: restarted
+    daemon_reload: true

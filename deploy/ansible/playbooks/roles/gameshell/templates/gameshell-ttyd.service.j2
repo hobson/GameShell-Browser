@@ -1,0 +1,32 @@
+# Managed by Ansible - do not edit by hand.
+# Rendered from deploy/ansible/playbooks/roles/gameshell/templates/.
+#
+# This supersedes the checked-in deploy/systemd/gameshell-ttyd.service, which
+# keeps its literal $USER/$HOME placeholders for the manual install path. The
+# real gain over sed-ing that file is the Environment= block below: the shell
+# scripts read these vars, so the playbook's settings actually reach them
+# instead of silently falling back to the scripts' own defaults.
+
+[Unit]
+Description=GameShell web terminal (ttyd)
+Documentation=https://github.com/phyver/GameShell
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target gameshell-janitor.service
+
+[Service]
+Type=simple
+User={{ app_user }}
+Group={{ app_group }}
+Environment=GSH_PORT={{ gsh_port }}
+Environment=GSH_IFACE={{ gsh_iface }}
+Environment=GSH_IMAGE={{ gsh_image }}
+# ttyd lands in /usr/bin (apt) or /usr/local/bin (upstream static fallback).
+# systemd's default PATH omits /usr/local/bin on some distros, so set it here.
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart={{ gsh_repo_dir }}/deploy/gsh-serve.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+# Managed by Ansible - do not edit by hand
+# Drop-in read from /etc/ssh/sshd_config.d/ by the stock Ubuntu sshd_config.
+
+Port {{ ssh_port }}
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+ChallengeResponseAuthentication no
+KbdInteractiveAuthentication no
+MaxAuthTries 3
+AllowUsers {{ app_user }}
+X11Forwarding no

@@ -1,0 +1,70 @@
+---
+# Configure a GameShell box. Two plays, because the connection details change
+# underneath us: a brand-new VM only has root on port 22, but once `base` has
+# hardened sshd we must come back as app_user on ssh_port.
+#
+#   ansible-playbook playbooks/configure.yml --limit gameshell
+#   ansible-playbook playbooks/configure.yml --limit gameshell --tags gameshell
+
+- name: Validate required variables before touching anything
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [always]
+  tasks:
+    - name: Assert the deployment is actually configured
+      ansible.builtin.assert:
+        that:
+          - gsh_domains | length > 0
+          - app_authorized_keys | length > 0
+          - gsh_repo_url | length > 0
+        fail_msg: |-
+          Set these in playbooks/group_vars/all.yml (or -e) before deploying:
+            gsh_domains          - domains Caddy requests a certificate for,
+                                   each with an A record already pointing here
+            app_authorized_keys  - SSH keys allowed in as {{ app_user }};
+                                   empty means you WILL be locked out once
+                                   password auth is disabled
+            gsh_repo_url         - which GameShell-Browser fork to deploy
+        success_msg: "Required variables present."
+
+    - name: Assert the image source is coherent
+      ansible.builtin.assert:
+        that:
+          - gsh_image_source in ['build', 'registry']
+          - gsh_image_source != 'registry' or (gsh_registry_image | length > 0)
+        fail_msg: >-
+          gsh_image_source must be 'build' or 'registry', and 'registry'
+          additionally requires gsh_registry_image to be set.
+
+# Only reachable on a box that has never been bootstrapped. On a re-run this
+# play is skipped by its own `when` -- sshd is no longer listening on 22 as root.
+- name: Bootstrap the VM as root (brand-new box only - port 22, root login)
+  hosts: hcloud_new:contabo_new
+  gather_facts: true
+  vars:
+    ansible_user: root
+    ansible_port: 22
+  roles:
+    - role: base
+      tags: [base, bootstrap]
+
+- name: Configure GameShell as the app user
+  hosts: hcloud_new:contabo_new:gameshell
+  gather_facts: true
+  become: true
+  vars:
+    ansible_user: "{{ app_user }}"
+    ansible_port: "{{ ssh_port }}"
+  roles:
+    # Each role is given its own name as a tag explicitly. Ansible does NOT do
+    # this from a bare `- rolename` entry, so `--tags gameshell` would otherwise
+    # match nothing but "Gathering Facts" and report changed=0.
+    - role: base
+      tags: [base]
+    - role: docker
+      tags: [docker]
+    - role: gameshell
+      tags: [gameshell]
+    - role: caddy
+      tags: [caddy]

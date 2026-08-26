@@ -1,0 +1,33 @@
+---
+# Create the VM on Hetzner or Contabo. Adds it to an in-memory
+# <provider>_new group, so configure.yml can run against it in the same
+# `ansible-playbook site.yml` invocation.
+#
+#   export HCLOUD_TOKEN=...                  # cloud_provider=hcloud
+#   export CONTABO_CLIENT_ID/... (4 vars)    # cloud_provider=contabo
+#
+#   ansible-playbook playbooks/provision.yml
+#   ansible-playbook playbooks/provision.yml -e cloud_provider=contabo --check
+
+- name: Provision the GameShell VM
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  pre_tasks:
+    - name: Require the deploy SSH public key to exist
+      ansible.builtin.stat:
+        path: "{{ ssh_key_public_path }}"
+      register: _ssh_pub
+
+    - name: Fail if the deploy SSH public key is missing
+      ansible.builtin.fail:
+        msg: >-
+          No SSH public key at {{ ssh_key_public_path }}. Generate one
+          (ssh-keygen -t ed25519) or point ssh_key_public_path at yours -- it is
+          the only way you will be able to log in to the new VM.
+      when: not _ssh_pub.stat.exists
+
+  roles:
+    - role: totalgood.cloud.cloud_vm
+      tags: [provision]

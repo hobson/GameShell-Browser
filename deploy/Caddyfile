@@ -12,5 +12,14 @@
 # is the ONLY public way in. Do not open 7682 in ufw.
 
 0.0.0.0 {
+	# Admin settings page (deploy/admin/) -- password-gated by the app itself,
+	# not by this route. Optional: skip installing gameshell-admin.service and
+	# this block stays a 404, reach it only via `ssh -L 7683:127.0.0.1:7683`.
+	handle_path /admin/* {
+		reverse_proxy 127.0.0.1:7683 {
+			header_up X-Forwarded-Prefix /admin
+		}
+	}
+
 	reverse_proxy 127.0.0.1:7682
 }

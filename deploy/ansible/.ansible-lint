@@ -1,0 +1,8 @@
+---
+# yaml[line-length] is disabled for one line in roles/docker/tasks/main.yml: a
+# literal apt deb822 source line inside a `content: |` block, which must stay on
+# one physical line to remain valid apt syntax. `# noqa` cannot be used there --
+# inside a literal block scalar it becomes part of the file content itself,
+# corrupting the apt source rather than suppressing the lint rule.
+skip_list:
+  - yaml[line-length]

@@ -1,0 +1,16 @@
+[Unit]
+Description=GameShell admin settings page
+Documentation=https://github.com/aboudia9/GameShell-Browser
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=$HOME/GameShell-Browser/deploy/admin
+ExecStart=$HOME/GameShell-Browser/deploy/admin/.venv/bin/python app.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,136 @@
+---
+# ttyd + the GameShell image + the two systemd services.
+#
+# Architecture (docs/browser-deployment.md): Caddy is the only public listener;
+# it proxies to ttyd on loopback; ttyd runs deploy/gsh-session.sh per connection,
+# which docker-runs one throwaway, resource-capped, network-less container per
+# player; the janitor reaps containers ttyd cannot clean up after itself.
+
+- name: Install ttyd from apt
+  ansible.builtin.apt:
+    name: ttyd
+    state: present
+  register: _gameshell_ttyd_apt
+  failed_when: false
+
+- name: Check the installed ttyd version
+  ansible.builtin.command: ttyd --version
+  register: _gameshell_ttyd_version
+  changed_when: false
+  failed_when: false
+
+- name: Record whether apt's ttyd is new enough
+  ansible.builtin.set_fact:
+    # ttyd prints e.g. "ttyd version 1.7.4". Anything older than 1.7.0 lacks -W
+    # (writable), and without -W the terminal renders but silently swallows
+    # every keystroke -- the single most confusing way this deployment can fail.
+    _gameshell_ttyd_ok: >-
+      {{ _gameshell_ttyd_version.rc == 0
+         and (_gameshell_ttyd_version.stdout | regex_search('([0-9]+\.[0-9]+\.[0-9]+)', '\1') | first
+              is version(gsh_ttyd_min_version, '>=')) }}
+
+- name: Install a modern ttyd binary when apt's is missing or too old
+  when: not (_gameshell_ttyd_ok | bool)
+  block:
+    - name: Report why we are bypassing apt
+      ansible.builtin.debug:
+        msg: >-
+          apt ttyd is missing or older than {{ gsh_ttyd_min_version }}
+          (got: {{ _gameshell_ttyd_version.stdout | default('not installed') | trim }}).
+          Installing the upstream static binary instead.
+
+    - name: Download the upstream static ttyd binary
+      vars:
+        _gameshell_ttyd_arch: "{{ 'x86_64' if ansible_architecture == 'x86_64' else 'aarch64' }}"
+      ansible.builtin.get_url:
+        url: >-
+          https://github.com/tsl0922/ttyd/releases/download/{{ gameshell_ttyd_fallback_version }}/ttyd.{{ _gameshell_ttyd_arch }}
+        dest: /usr/local/bin/ttyd
+        mode: "0755"
+        owner: root
+        group: root
+
+    - name: Re-check the ttyd version
+      ansible.builtin.command: ttyd --version
+      register: _gameshell_ttyd_recheck
+      changed_when: false
+
+    - name: Assert ttyd is now new enough
+      ansible.builtin.assert:
+        that:
+          - _gameshell_ttyd_recheck.stdout | regex_search('([0-9]+\.[0-9]+\.[0-9]+)', '\1') | first
+            is version(gsh_ttyd_min_version, '>=')
+        fail_msg: >-
+          ttyd is still older than {{ gsh_ttyd_min_version }} after installing the
+          static binary ({{ _gameshell_ttyd_recheck.stdout | trim }}). Without -W the web
+          terminal accepts no input; refusing to continue.
+
+- name: Clone or update the GameShell-Browser repo
+  ansible.builtin.git:
+    repo: "{{ gsh_repo_url }}"
+    dest: "{{ gsh_repo_dir }}"
+    version: "{{ gsh_repo_version }}"
+    force: false
+  become: true
+  become_user: "{{ app_user }}"
+  register: _gameshell_gsh_repo
+
+- name: Ensure the deploy scripts are executable
+  ansible.builtin.file:
+    path: "{{ gsh_repo_dir }}/deploy/{{ item }}"
+    mode: "0755"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+  loop:
+    - gsh-serve.sh
+    - gsh-session.sh
+    - gsh-janitor.sh
+
+- name: Provide the container image
+  ansible.builtin.include_tasks: "image_{{ gsh_image_source }}.yml"
+
+- name: Template the systemd units
+  ansible.builtin.template:
+    src: "{{ item }}.service.j2"
+    dest: "/etc/systemd/system/{{ item }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - gameshell-ttyd
+    - gameshell-janitor
+  notify:
+    - Restart gameshell-janitor
+    - Restart gameshell-ttyd
+
+- name: Enable and start the GameShell services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    daemon_reload: true
+    enabled: true
+    state: started
+  loop:
+    - gameshell-janitor.service
+    - gameshell-ttyd.service
+
+- name: Flush handlers so the services are running the new config before we verify
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify ttyd is listening on loopback only
+  ansible.builtin.command: ss -ltnH "sport = :{{ gsh_port }}"
+  register: _gameshell_ttyd_listen
+  changed_when: false
+  retries: 5
+  delay: 2
+  until: _gameshell_ttyd_listen.stdout | trim | length > 0
+
+- name: Assert ttyd is NOT exposed on a public interface
+  ansible.builtin.assert:
+    that:
+      - "'0.0.0.0:' ~ gsh_port not in _gameshell_ttyd_listen.stdout"
+      - "'*:' ~ gsh_port not in _gameshell_ttyd_listen.stdout"
+    fail_msg: >-
+      ttyd is listening on a public interface ({{ _gameshell_ttyd_listen.stdout | trim }}).
+      It must bind loopback only -- it serves an unauthenticated terminal and
+      Caddy is meant to be the sole public entry point. Check gsh_iface.
+    success_msg: "ttyd is bound to loopback only."

@@ -18,16 +18,30 @@ set -uo pipefail
 
 IMAGE="${GSH_IMAGE:-gameshell}"
 
+# Per-deployment session defaults -- read fresh on every connection, so the
+# admin app (deploy/admin/) can change these and have it take effect on the
+# very next session, with no rebuild or service restart. Missing file (a
+# deployment that hasn't set this up) falls back to the defaults below,
+# unchanged from this script's behaviour before config.env existed.
+GSH_ENABLE_PYTHON=1
+GSH_INDEX_FILE=missions/default.idx
+CONFIG_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/config.env"
+# shellcheck disable=SC1090
+[ -f "$CONFIG_FILE" ] && . "$CONFIG_FILE"
+
 # The name is the handle the janitor uses to find and reap this container.
 # The `gsh-` prefix is load-bearing -- the janitor only ever touches `gsh-*`.
 NAME="gsh-$$-${RANDOM}"
 
 # `exec` REPLACES this shell with docker -- same PID, no bash left behind to
 # catch or defer signals. docker must be in the foreground for -it to work.
+# The trailing GSH_INDEX_FILE arg is forwarded by gameshell.sh straight into
+# start.sh, which already accepts an index-file path positionally.
 exec docker run --rm -it \
     --name "$NAME" \
     --memory 256m \
     --cpus 0.5 \
     --network none \
     --pids-limit 128 \
-    "$IMAGE"
+    -e "GSH_ENABLE_PYTHON=${GSH_ENABLE_PYTHON}" \
+    "$IMAGE" ${GSH_INDEX_FILE:+"$GSH_INDEX_FILE"}
