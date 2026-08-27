@@ -2,15 +2,30 @@ Mission goal
 ============
 
 Go to the top of the main tower of the castle and create a keg of cider
-using the Python script ``cider_press.py``.
+using a Python script.
 
-Steps:
+Two presses are waiting for you there:
+
+  cider_press.py
+    A short, simple script -- just run it, no arguments needed.
+
+  royal_cider_press.py
+    A fussier press: it only works on the real ``barrel_of_apples`` from
+    the castle's Cellar (it checks the barrel's signature), so you'll
+    need to fetch the barrel first.
+
+Either one completes the mission.
+
+Steps (for royal_cider_press.py):
   1. Navigate to the castle's Cellar and find the ``barrel_of_apples`` file.
   2. Move (``mv``) the ``barrel_of_apples`` file to the top of the tower.
   3. Navigate to the top of the tower using ``cd``, if you aren't there
      already.
-  4. Run the command: ``python cider_press.py``
+  4. Run the command: ``python royal_cider_press.py``
   5. This will create a file called ``keg_of_cider.txt`` with cider inside!
+
+Or, more simply: ``cd`` to the top of the tower and run
+``python cider_press.py``.
 
 
 Useful commands
@@ -38,7 +53,7 @@ mv SOURCE DESTINATION
 python SCRIPT
   Run a Python script.
   Example: ``python cider_press.py`` runs the cider_press.py script.
-  Run ``python cider_press.py --help`` to see its options, including
+  Run ``python royal_cider_press.py --help`` to see its options, including
   where the barrel_of_apples file lives.
 
 gsh check

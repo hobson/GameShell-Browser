@@ -5,5 +5,5 @@ cellar="$(eval_gettext '$GSH_HOME/Castle/Cellar')"
 
 mv "$cellar/$(gettext "barrel_of_apples")" "$tower/"
 cd "$tower"
-python cider_press.py
+python royal_cider_press.py
 gsh check

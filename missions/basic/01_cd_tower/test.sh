@@ -18,26 +18,34 @@ gsh assert check false
 cd
 gsh assert check false
 
-# At the top of the tower, but no barrel and no keg yet
+# At the top of the tower, but no keg yet
 cd "$tower"
 gsh assert check false
 
-# Running the press with no barrel present should fail, and create no keg
+# The simple press: no barrel needed, always succeeds
 cd "$tower"
 python cider_press.py
+gsh assert check true
+test "$(cat "$tower/keg_of_cider.txt")" = "Lots of NA cider!!!" || echo "FAIL: unexpected keg_of_cider.txt content" >&2
+rm -f "$tower/keg_of_cider.txt"
+
+# The royal press requires a barrel. Running it with no barrel present
+# should fail, and create no keg
+cd "$tower"
+python royal_cider_press.py
 gsh assert check false
 
 # A fake barrel (wrong contents, no valid signature) should be rejected
 cd "$tower"
 echo "not really apples" > barrel_of_apples
-python cider_press.py
+python royal_cider_press.py
 gsh assert check false
 rm -f "$tower/barrel_of_apples"
 
 # Passing an explicit path to the still-in-the-Cellar barrel should work,
 # with no move required
 cd "$tower"
-python cider_press.py "$cellar/$barrel_name"
+python royal_cider_press.py "$cellar/$barrel_name"
 gsh assert check true
 rm -f "$tower/keg_of_cider.txt"
 
@@ -46,7 +54,7 @@ rm -f "$tower/keg_of_cider.txt"
 # Cellar no longer has a copy to compare against
 mv "$cellar/$barrel_name" "$tower/"
 cd "$tower"
-python cider_press.py
+python royal_cider_press.py
 gsh assert check true
 
 # Verify the keg was created with correct content
