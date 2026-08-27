@@ -1,7 +1,13 @@
 Mission goal
 ============
 
-Go to the top of the main tower of the castle.
+Go to the top of the main tower of the castle and create a keg of cider
+using the Python script ``cider_press.py``.
+
+Steps:
+  1. Navigate to the top of the tower using ``cd``
+  2. Run the command: ``python cider_press.py``
+  3. This will create a file called ``keg_of_cider.txt`` with cider inside!
 
 
 Useful commands
@@ -18,6 +24,10 @@ pwd
 ls
   Show a list of locations that are currently accessible.
   Remark: ``ls`` is an abbreviation of "list".
+
+python SCRIPT
+  Run a Python script.
+  Example: ``python cider_press.py`` runs the cider_press.py script.
 
 gsh check
   Check if the mission objective has been achieved.

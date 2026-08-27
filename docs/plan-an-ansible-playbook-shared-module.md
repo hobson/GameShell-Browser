@@ -362,3 +362,60 @@ No cap on concurrent sessions, no max session lifetime, no authentication (Caddy
 `basic_auth` is the documented option), no saved player progress, and
 `intermediate/04_bg_xeyes` cannot work headless. Adding a `gsh_max_sessions` knob would
 mean changing `gsh-serve.sh` / `gsh-session.sh`, which this plan deliberately leaves alone.
+
+--- 
+
+## Implemented Plan Part 1
+
+From claude:
+
+```
+Part 1 — ~/code/od/ansible-cloud (new repo, committed): the totalgood.cloud collection.
+- contabo_ssh_key / contabo_instance modules with a real OAuth2 flow (auth.contabo.com) and x-request-id headers — the piece rtod's broken provision-contabo.yml never had.
+- contabo_instance is create-if-absent only; state=absent refuses with a message pointing at the customer panel (tested — it fires correctly).
+- cloud_vm role dispatches to hetzner.hcloud (adapted from rtod's working provision.yml, updated to the v7 module names) or the Contabo modules, converging on cloud_vm_name/cloud_vm_ipv4/cloud_vm_id and an in-memory <provider>_new inventory group.
+- Passes ansible-lint at the production profile (5/5).
+
+Part 2 — deploy/ansible/ in this repo (untracked, not committed): site.yml / provision.yml / configure.yml, roles base (SSH hardening, incl. Ubuntu 24.04's socket-activated sshd), docker, gameshell (ttyd version guard, build-or-registry image, templated systemd units with real Environment= vars instead of the old sed approach), caddy (auto-HTTPS). Also passes ansible-lint cleanly.
+- docs/browser-deployment.md now points at the playbook as the primary path; docs/deploy_gameshell_run_inside_vm.sh is marked superseded with its specific defects documented.
+```
+
+## Verified 
+
+Before claude ran out of tokens, according to claude it verified:
+
+```
+- Every YAML/Python file parses; ansible-doc resolves both Contabo modules; --syntax-check passes for both playbook trees.
+- Required-var assertions fire with clear messages when gsh_domains/app_authorized_keys/gsh_repo_url are unset.
+- All four templates (gameshell-ttyd.service, gameshell-janitor.service, Caddyfile, sshd_hardening.conf) rendered with realistic values and validated with the real tools (caddy validate, sshd -t, systemd-analyze verify).
+- contabo_instance state=absent confirmed to fail with the panel-redirect message.
+```
+
+## Not yet done
+
+Claude thought it would need hetzner cloud credentials but `ssh gsh` should give you access to an existing VM that I'd like to reconfigure with this new ansible code and the latest revision of GameShell-Browser that includes a Python interpretter accessible within the GameShell for students and game players.
+
+Here's Claude's "not yet done" list:
+
+```
+- Deploy the latest code to an existing VM on hetzner cloud
+- End-to-end browser verification (two tabs, janitor reaping, fork-bomb, reboot survival).
+```
+
+The User has committed the latest Game-Browser, and you should be able to do a live verification of the ansible playbook, without provisioning a new VM.
+
+### User Prompt to Claude:
+
+Use the new ansible-cloud module to deploy gameshell-browser to deploy the latest gameshell-browser with a python interpretter inside the docker containers.
+
+### Claude's reply:
+
+```
+Also worth confirming: Python is already baked in. The current Dockerfile (committed at 79e8aab) already installs python3/python-is-python3, and deploy/gsh-session.sh defaults GSH_ENABLE_PYTHON=1 unless deploy/config.env says otherwise — so a plain deploy of main already gives every session a Python interpreter with no extra flags needed.
+
+● User answered Claude's questions:
+· Which cloud provider should I provision on, and how should I get the API credentials? → Use the option for this playbook that allows it to reconfigure an existing GameShell-Browser VM.
+· Where should I get the credential value(s) from? I can't type a secret for you -- point me at where it already lives, or tell me the file to write it to. → OBE
+· Which domain(s) should Caddy request a certificate for? gsh.proai.org / bash.proai.org / sh.proai.org appear in the old deploy script and don't currently resolve to anything -- reusable if you control that zone. → gsh.proai.org (+ bash/sh aliases)
+· This will create a real, billed VM and expose it to the public internet on ports 80/443. Confirm you want me to actually run this now. → Yes, provision and deploy now (Recommended)
+```
