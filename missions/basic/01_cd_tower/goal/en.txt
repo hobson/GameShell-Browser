@@ -5,9 +5,12 @@ Go to the top of the main tower of the castle and create a keg of cider
 using the Python script ``cider_press.py``.
 
 Steps:
-  1. Navigate to the top of the tower using ``cd``
-  2. Run the command: ``python cider_press.py``
-  3. This will create a file called ``keg_of_cider.txt`` with cider inside!
+  1. Navigate to the castle's Cellar and find the ``barrel_of_apples`` file.
+  2. Move (``mv``) the ``barrel_of_apples`` file to the top of the tower.
+  3. Navigate to the top of the tower using ``cd``, if you aren't there
+     already.
+  4. Run the command: ``python cider_press.py``
+  5. This will create a file called ``keg_of_cider.txt`` with cider inside!
 
 
 Useful commands
@@ -25,9 +28,18 @@ ls
   Show a list of locations that are currently accessible.
   Remark: ``ls`` is an abbreviation of "list".
 
+mv SOURCE DESTINATION
+  Move (or rename) SOURCE to DESTINATION.
+  Example, from inside the Cellar: ``mv barrel_of_apples
+  ../Main_tower/First_floor/Second_floor/Top_of_the_tower`` moves the
+  barrel up to the top of the tower (Cellar and Main_tower are both
+  directly inside Castle).
+
 python SCRIPT
   Run a Python script.
   Example: ``python cider_press.py`` runs the cider_press.py script.
+  Run ``python cider_press.py --help`` to see its options, including
+  where the barrel_of_apples file lives.
 
 gsh check
   Check if the mission objective has been achieved.
@@ -39,8 +51,8 @@ gsh reset
 Remarks
 -------
 
-UPPERCASE words appearing in commands are meta-variables: you need 
+UPPERCASE words appearing in commands are meta-variables: you need
 to replace them by appropriate (string) values.
 
-Most filesystems treat uppercase and lowercase characters 
+Most filesystems treat uppercase and lowercase characters
 differently. Make sure you use the correct path.
