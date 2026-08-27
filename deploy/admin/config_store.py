@@ -10,7 +10,7 @@ from pathlib import Path
 
 DEFAULTS = {
     "GSH_ENABLE_PYTHON": "1",
-    "GSH_INDEX_FILE": "missions/default.idx",
+    "GSH_INDEX_FILE": "default.idx",
 }
 
 

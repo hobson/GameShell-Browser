@@ -32,14 +32,19 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 
 def _available_index_files() -> list[str]:
     """Every mission list (*.idx under missions/) an instructor could pick,
-    as paths relative to REPO_ROOT — the same form start.sh's positional
-    index-file argument already accepts. default.idx always sorts first.
+    as paths relative to missions/ — what GSH_INDEX_FILE actually needs:
+    gsh-session.sh's positional arg is forwarded into a self-extracting
+    archive, where make_index prefixes every path with $GSH_MISSIONS/ (see
+    scripts/make_index's GSH_EXEC_FILE branch), so a REPO_ROOT-relative path
+    like "missions/default.idx" resolves to a nonexistent doubled
+    "missions/missions/default.idx". default.idx always sorts first.
     """
+    missions_dir = REPO_ROOT / "missions"
     paths = sorted(
-        p.relative_to(REPO_ROOT).as_posix()
-        for p in (REPO_ROOT / "missions").rglob("*.idx")
+        p.relative_to(missions_dir).as_posix()
+        for p in missions_dir.rglob("*.idx")
     )
-    paths.sort(key=lambda p: (p != "missions/default.idx", p))
+    paths.sort(key=lambda p: (p != "default.idx", p))
     return paths
 
 

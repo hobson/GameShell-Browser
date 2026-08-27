@@ -24,7 +24,7 @@ IMAGE="${GSH_IMAGE:-gameshell}"
 # deployment that hasn't set this up) falls back to the defaults below,
 # unchanged from this script's behaviour before config.env existed.
 GSH_ENABLE_PYTHON=1
-GSH_INDEX_FILE=missions/default.idx
+GSH_INDEX_FILE=default.idx
 CONFIG_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/config.env"
 # shellcheck disable=SC1090
 [ -f "$CONFIG_FILE" ] && . "$CONFIG_FILE"
